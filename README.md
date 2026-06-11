@@ -73,3 +73,5 @@
 - 単一HTMLファイル（HTML / CSS / Vanilla JavaScript）
 - 依存ライブラリなし（クラウド同期時のみ Firebase SDK をCDNから読み込み）
 - データ保存：localStorage ＋（任意）Cloud Firestore
+
+- 
