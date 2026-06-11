@@ -72,6 +72,8 @@
   .due.soon{color:var(--warn)}
   .due.ok{color:var(--muted);font-weight:500}
   .card .memo{margin-top:8px;font-size:13px;color:var(--muted);white-space:pre-wrap;word-break:break-word}
+  .card-links{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
+  .card-links:empty{display:none}
   .card a.link{font-size:13px;color:var(--primary);text-decoration:none}
   .done{opacity:.55}
 
@@ -324,6 +326,29 @@ function dueText(due){
   return {txt:`${fmt}（あと${n}日）`, cls:'ok'};
 }
 
+/* ---- Googleカレンダー用URL ---- */
+function gcalUrl(e){
+  if(!e.due) return '';
+  const start = e.due.replace(/-/g, '');            // 例: 20260701
+  const d = new Date(e.due+'T00:00:00Z');           // UTCで解釈（タイムゾーンずれ防止）
+  d.setUTCDate(d.getUTCDate()+1);                   // 終日予定は終了日=翌日
+  const end = d.toISOString().slice(0,10).replace(/-/g, '');
+  const title = `【就活】${e.name}${e.dueLabel ? ' '+e.dueLabel : ''}`;
+  const details = [
+    e.role ? '職種: '+e.role : '',
+    '選考: '+stage(e.status).t,
+    e.memo || '',
+    e.url || ''
+  ].filter(Boolean).join('\n');
+  const p = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${start}/${end}`,
+    details: details
+  });
+  return 'https://calendar.google.com/calendar/render?' + p.toString();
+}
+
 /* ---- render ---- */
 function render(){
   renderFilters();
@@ -367,7 +392,10 @@ function cardHTML(e){
       ${d.txt?`<span class="due ${d.cls}">📅 <span>${d.txt}</span>${e.dueLabel?` <span class="lbl">${esc(e.dueLabel)}</span>`:''}</span>`:''}
     </div>
     ${e.memo?`<div class="memo">${esc(e.memo)}</div>`:''}
-    ${e.url?`<div style="margin-top:8px"><a class="link" href="${esc(e.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 企業ページを開く</a></div>`:''}
+    <div class="card-links">
+      ${e.due?`<a class="link" href="${gcalUrl(e)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📅 カレンダーに追加</a>`:''}
+      ${e.url?`<a class="link" href="${esc(e.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 企業ページを開く</a>`:''}
+    </div>
   </div>`;
 }
 
