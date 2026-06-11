@@ -136,6 +136,16 @@
   .tut-list{margin:0;padding-left:22px}
   .tut-list li{margin:9px 0;font-size:14px;line-height:1.6}
   .tut-note{font-size:13px;color:var(--muted);background:#f1f5f9;border-radius:10px;padding:10px 12px;margin-top:14px}
+  /* login credentials */
+  .cred-hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+  .cred-unlock{width:100%;margin-top:6px}
+  #credFields input{margin-top:8px}
+  .cv-row{margin:14px 0}
+  .cv-row .cv-label{font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+  .cv-val{display:flex;align-items:center;gap:8px}
+  .cv-val input{flex:1;font-family:monospace;font-size:15px}
+  .cv-copy{flex:0 0 auto;border:1px solid var(--line);background:#f8fafc;border-radius:8px;padding:10px 12px;font-size:13px;cursor:pointer;white-space:nowrap}
+  .cv-copy:active{background:#e2e8f0}
   .cloud-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
   .cbtn{
     border:1px solid var(--line);background:#fff;border-radius:10px;
@@ -240,10 +250,49 @@
     <label>メモ</label>
     <textarea id="f_memo" placeholder="選考の感触、持ち物、連絡事項など"></textarea>
 
+    <label>🔐 マイページのログイン情報</label>
+    <input id="f_mypage" placeholder="マイページのURL（https://...）" autocomplete="off" inputmode="url">
+    <div id="credLocked" style="display:none">
+      <button type="button" class="btn ghost cred-unlock" onclick="unlockForCred()">🔓 ロックを解除してID・パスワードを入力</button>
+      <p class="cred-hint" id="credHasNote"></p>
+    </div>
+    <div id="credFields" style="display:none">
+      <input id="f_loginId" placeholder="ログインID / メールアドレス" autocomplete="off">
+      <input id="f_loginPw" placeholder="パスワード" autocomplete="off">
+      <p class="cred-hint">🔒 ID・パスワードはマスターパスワードで暗号化して保存されます</p>
+    </div>
+
     <div class="actions">
       <button class="btn del" id="delBtn" onclick="removeEntry()" style="display:none">削除</button>
       <button class="btn ghost" onclick="closeForm()">キャンセル</button>
       <button class="btn primary" onclick="saveEntry()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- master password modal -->
+<div class="overlay" id="vaultOverlay">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <h2 id="vaultTitle">🔐 マスターパスワード</h2>
+    <p class="cred-hint" id="vaultDesc"></p>
+    <label>マスターパスワード</label>
+    <input id="v_pw" type="password" placeholder="合言葉" autocomplete="off"
+           onkeydown="if(event.key==='Enter')submitVault()">
+    <div class="actions">
+      <button class="btn ghost" onclick="closeVault()">キャンセル</button>
+      <button class="btn primary" onclick="submitVault()">OK</button>
+    </div>
+  </div>
+</div>
+
+<!-- credential view modal -->
+<div class="overlay" id="credViewOverlay">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <h2>🔐 ログイン情報</h2>
+    <div id="cv_body"></div>
+    <div class="actions">
+      <button class="btn ghost" onclick="lockVault()">🔒 ロックする</button>
+      <button class="btn primary" onclick="closeCredView()">閉じる</button>
     </div>
   </div>
 </div>
@@ -426,6 +475,8 @@ function cardHTML(e){
     <div class="card-links">
       ${e.due?`<a class="link" href="${gcalUrl(e)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📅 カレンダーに追加</a>`:''}
       ${e.url?`<a class="link" href="${esc(e.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 企業ページを開く</a>`:''}
+      ${e.mypage?`<a class="link" href="${esc(e.mypage)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🪪 マイページを開く</a>`:''}
+      ${e.cred?`<a class="link" href="#" onclick="event.stopPropagation();showCred('${e.id}');return false;">🔐 ログイン情報</a>`:''}
     </div>
   </div>`;
 }
@@ -496,11 +547,13 @@ function paintRate(){
   });
 }
 
-function openForm(id){
+let _formEntry = null;
+async function openForm(id){
   const editing = !!id;
   document.getElementById('formTitle').textContent = editing ? '企業を編集' : '企業を追加';
   document.getElementById('delBtn').style.display = editing ? 'block' : 'none';
   const e = editing ? entries.find(x=>x.id===id) : null;
+  _formEntry = e || null;
   document.getElementById('f_id').value = editing ? id : '';
   document.getElementById('f_name').value = e?.name || '';
   document.getElementById('f_role').value = e?.role || '';
@@ -509,16 +562,41 @@ function openForm(id){
   document.getElementById('f_duelabel').value = e?.dueLabel || '';
   document.getElementById('f_url').value = e?.url || '';
   document.getElementById('f_memo').value = e?.memo || '';
+  document.getElementById('f_mypage').value = e?.mypage || '';
   formRate = e?.rate || 0;
   paintRate();
+  await renderCredArea();
   document.getElementById('overlay').classList.add('open');
   document.body.style.overflow='hidden';
+}
+// ログイン情報の欄を、ロック状態に応じて表示
+async function renderCredArea(){
+  const locked = document.getElementById('credLocked');
+  const fields = document.getElementById('credFields');
+  if(isUnlocked()){
+    locked.style.display = 'none';
+    fields.style.display = 'block';
+    let cred = { loginId:'', loginPw:'' };
+    if(_formEntry && _formEntry.cred){
+      try{ cred = await decryptJSON(_vaultKey, _formEntry.cred); }catch(e){}
+    }
+    document.getElementById('f_loginId').value = cred.loginId || '';
+    document.getElementById('f_loginPw').value = cred.loginPw || '';
+  }else{
+    locked.style.display = 'block';
+    fields.style.display = 'none';
+    document.getElementById('credHasNote').textContent =
+      (_formEntry && _formEntry.cred) ? '🔒 保存済みのログイン情報があります' : '';
+  }
+}
+function unlockForCred(){
+  openVault(async ()=>{ await renderCredArea(); });
 }
 function closeForm(){
   document.getElementById('overlay').classList.remove('open');
   document.body.style.overflow='';
 }
-function saveEntry(){
+async function saveEntry(){
   const name = document.getElementById('f_name').value.trim();
   if(!name){ alert('企業名を入力してください'); return; }
   const id = document.getElementById('f_id').value;
@@ -530,8 +608,17 @@ function saveEntry(){
     dueLabel: document.getElementById('f_duelabel').value.trim(),
     url: document.getElementById('f_url').value.trim(),
     memo: document.getElementById('f_memo').value.trim(),
+    mypage: document.getElementById('f_mypage').value.trim(),
     rate: formRate,
   };
+  // ログイン情報：ロック解除中なら暗号化して保存。ロック中は既存を維持。
+  if(isUnlocked()){
+    const loginId = document.getElementById('f_loginId').value.trim();
+    const loginPw = document.getElementById('f_loginPw').value;
+    data.cred = (loginId || loginPw) ? await encryptJSON(_vaultKey, {loginId, loginPw}) : null;
+  }else{
+    data.cred = id ? (entries.find(x=>x.id===id)?.cred || null) : null;
+  }
   if(id){
     const i = entries.findIndex(x=>x.id===id);
     entries[i] = {...entries[i], ...data};
@@ -553,7 +640,8 @@ document.getElementById('overlay').addEventListener('click', closeForm);
 
 /* ---- backup ---- */
 function exportData(){
-  const blob = new Blob([JSON.stringify(entries,null,2)],{type:'application/json'});
+  const payload = { entries, vault: getVaultMeta() };
+  const blob = new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `shukatsu_backup_${new Date().toISOString().slice(0,10)}.json`;
@@ -566,10 +654,13 @@ function importData(ev){
   const r = new FileReader();
   r.onload = ()=>{
     try{
-      const data = JSON.parse(r.result);
-      if(!Array.isArray(data)) throw 0;
-      if(!confirm(`${data.length} 件を読み込みます。現在のデータは置き換えられます。よろしいですか？`)) return;
-      entries = data.map(e=>({id:e.id||uid(), ...e}));
+      const raw = JSON.parse(r.result);
+      // 旧形式（配列）・新形式（{entries, vault}）の両対応
+      const list = Array.isArray(raw) ? raw : raw.entries;
+      if(!Array.isArray(list)) throw 0;
+      if(!confirm(`${list.length} 件を読み込みます。現在のデータは置き換えられます。よろしいですか？`)) return;
+      entries = list.map(e=>({id:e.id||uid(), ...e}));
+      if(!Array.isArray(raw)) restoreVaultMeta(raw.vault);
       save(); render();
     }catch(e){ alert('読み込めませんでした。バックアップファイルを確認してください。'); }
   };
@@ -635,7 +726,7 @@ async function cloudUpload(){
   try{
     setSyncStatus('☁️↑ アップロード中…');
     const { fs, doc, setDoc } = await ensureDb();
-    await setDoc(doc(fs, 'boards', code), { entries, updatedAt: Date.now() });
+    await setDoc(doc(fs, 'boards', code), { entries, vault: getVaultMeta(), updatedAt: Date.now() });
     localStorage.setItem(LAST_SYNC, Date.now());
     setSyncStatus(`<span class="dot on"></span>✅ ${entries.length}件をアップロードしました`);
     setTimeout(setSyncStatus, 2500);
@@ -660,6 +751,7 @@ async function cloudDownload(){
     const cloud = snap.data().entries || [];
     if(!confirm(`クラウドの ${cloud.length} 件で、この端末のデータ（${entries.length}件）を置き換えます。\nよろしいですか？`)){ setSyncStatus(); return; }
     entries = cloud.map(e=>({ id:e.id||uid(), ...e }));
+    restoreVaultMeta(snap.data().vault);
     save(); render();
     localStorage.setItem(LAST_SYNC, Date.now());
     setSyncStatus(`<span class="dot on"></span>✅ ${entries.length}件をダウンロードしました`);
@@ -705,6 +797,138 @@ function saveCloud(){
 }
 
 document.getElementById('cloudOverlay').addEventListener('click', closeCloud);
+
+/* ---- secure vault: マスターパスワードでID/PWを暗号化 (Web Crypto / AES-GCM) ---- */
+const VAULT_SALT = 'shukatsu.vault.salt';
+const VAULT_CHECK = 'shukatsu.vault.check';
+let _vaultKey = null;           // 復号用の鍵（メモリのみ・保存しない）
+let _vaultCallback = null;
+
+function vaultExists(){ return !!localStorage.getItem(VAULT_SALT); }
+function isUnlocked(){ return !!_vaultKey; }
+function b64(bytes){ return btoa(String.fromCharCode.apply(null, bytes)); }
+function unb64(s){ return Uint8Array.from(atob(s), c=>c.charCodeAt(0)); }
+
+async function deriveKey(password, salt){
+  const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:150000, hash:'SHA-256' },
+    km, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']
+  );
+}
+async function encryptJSON(key, obj){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, new TextEncoder().encode(JSON.stringify(obj)));
+  return { iv: b64(iv), ct: b64(new Uint8Array(ct)) };
+}
+async function decryptJSON(key, blob){
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:unb64(blob.iv)}, key, unb64(blob.ct));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+async function setupVault(password){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(password, salt);
+  const check = await encryptJSON(key, {v:1});
+  localStorage.setItem(VAULT_SALT, b64(salt));
+  localStorage.setItem(VAULT_CHECK, JSON.stringify(check));
+  _vaultKey = key;
+}
+async function unlockVault(password){
+  const salt = unb64(localStorage.getItem(VAULT_SALT));
+  const key = await deriveKey(password, salt);
+  try{
+    await decryptJSON(key, JSON.parse(localStorage.getItem(VAULT_CHECK)));
+    _vaultKey = key;
+    return true;
+  }catch(e){ return false; }
+}
+// 同期・バックアップに乗せるための salt/check（端末をまたいで同じマスターパスワードで開ける）
+function getVaultMeta(){
+  if(!vaultExists()) return null;
+  return { salt: localStorage.getItem(VAULT_SALT), check: localStorage.getItem(VAULT_CHECK) };
+}
+function restoreVaultMeta(meta){
+  // この端末にまだ金庫が無いときだけ取り込む（既存の金庫を壊さない）
+  if(meta && meta.salt && meta.check && !vaultExists()){
+    localStorage.setItem(VAULT_SALT, meta.salt);
+    localStorage.setItem(VAULT_CHECK, meta.check);
+  }
+}
+
+/* マスターパスワードのモーダル（初回は設定、以降は入力） */
+function openVault(cb){
+  _vaultCallback = cb || null;
+  const setup = !vaultExists();
+  document.getElementById('vaultTitle').textContent = setup ? '🔐 マスターパスワードを設定' : '🔐 マスターパスワードを入力';
+  document.getElementById('vaultDesc').textContent = setup
+    ? 'ログイン情報を暗号化する合言葉を決めてください。⚠️ 忘れると保存済みのID・パスワードは元に戻せません。'
+    : '保存したログイン情報を表示するには、設定したマスターパスワードを入力してください。';
+  document.getElementById('v_pw').value = '';
+  document.getElementById('vaultOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  setTimeout(()=>document.getElementById('v_pw').focus(), 50);
+}
+function closeVault(){
+  document.getElementById('vaultOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+async function submitVault(){
+  const pw = document.getElementById('v_pw').value;
+  if(pw.length < 4){ alert('マスターパスワードは4文字以上にしてください'); return; }
+  try{
+    if(!vaultExists()) await setupVault(pw);
+    else if(!await unlockVault(pw)){ alert('マスターパスワードが違います'); return; }
+  }catch(err){ alert('エラー: '+err.message); return; }
+  closeVault();
+  const cb = _vaultCallback; _vaultCallback = null;
+  if(cb) await cb();
+}
+document.getElementById('vaultOverlay').addEventListener('click', closeVault);
+
+/* カードから「🔐 ログイン情報」を見る */
+async function showCred(id){
+  const e = entries.find(x=>x.id===id);
+  if(!e || !e.cred) return;
+  if(!isUnlocked()){ openVault(()=>showCred(id)); return; }
+  let c;
+  try{ c = await decryptJSON(_vaultKey, e.cred); }
+  catch(err){ alert('復号に失敗しました。'); return; }
+  document.getElementById('cv_body').innerHTML = `
+    <p class="cred-hint" style="font-weight:600;color:var(--text)">${esc(e.name)}</p>
+    ${e.mypage?`<div class="cv-row"><div class="cv-label">マイページ</div>
+      <a class="link" href="${esc(e.mypage)}" target="_blank" rel="noopener">🪪 ログイン画面を開く</a></div>`:''}
+    <div class="cv-row">
+      <div class="cv-label">ログインID</div>
+      <div class="cv-val"><input id="cv_id" readonly value="${esc(c.loginId||'')}">
+        <button class="cv-copy" onclick="copyFrom('cv_id')">コピー</button></div>
+    </div>
+    <div class="cv-row">
+      <div class="cv-label">パスワード</div>
+      <div class="cv-val"><input id="cv_pw" type="password" readonly value="${esc(c.loginPw||'')}">
+        <button class="cv-copy" onclick="togglePw()">👁</button>
+        <button class="cv-copy" onclick="copyFrom('cv_pw')">コピー</button></div>
+    </div>`;
+  document.getElementById('credViewOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function copyFrom(id){
+  const v = document.getElementById(id).value;
+  navigator.clipboard?.writeText(v);
+}
+function togglePw(){
+  const el = document.getElementById('cv_pw');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+function closeCredView(){
+  document.getElementById('credViewOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+function lockVault(){
+  _vaultKey = null;
+  closeCredView();
+  alert('ロックしました。次に見るときはマスターパスワードが必要です。');
+}
+document.getElementById('credViewOverlay').addEventListener('click', closeCredView);
 
 /* ---- tutorial & hidden cloud menu ---- */
 const TUT_KEY = 'shukatsu.tutorialDone';
