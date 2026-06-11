@@ -10,10 +10,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#14161b; --card:#1e2128; --line:#2c303a; --text:#e8e8ea; --muted:#8a8f9c;
-    --accent:#a78bfa; --accent-d:#8b6df0; --accent-ink:#15171c;
-    --danger:#fb5d63; --warn:#f0b24a; --ok:#4ade80;
-    --glow:0 0 20px rgba(167,139,250,.10);
+    --bg:#1b1e24; --card:#23272f; --line:#333944; --text:#d4d7dd; --muted:#888d99;
+    --accent:#a394d6; --accent-d:#8f7dc8; --accent-ink:#1b1e24;
+    --danger:#e0727a; --warn:#d9a657; --ok:#6cc488;
+    --glow:none;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -24,7 +24,7 @@
   }
   header{
     position:sticky; top:0; z-index:20;
-    background:#181a20; color:var(--text); padding:14px 16px;
+    background:#20242c; color:var(--text); padding:14px 16px;
     border-bottom:1px solid var(--line);
   }
   header .wrap{max-width:820px;margin:0 auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -95,7 +95,7 @@
     position:fixed;right:18px;bottom:22px;z-index:25;
     width:58px;height:58px;border-radius:50%;border:none;
     background:var(--accent);color:var(--accent-ink);font-size:30px;line-height:1;
-    box-shadow:0 6px 20px rgba(167,139,250,.4);cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;
   }
   .fab:active{background:var(--accent-d)}
 
@@ -372,14 +372,14 @@ const FB_CFG = 'shukatsu.fbconfig';
 const SYNC_CODE = 'shukatsu.synccode';
 const LAST_SYNC = 'shukatsu.lastsync';
 const STAGES = [
-  {v:'entry',   t:'エントリー',   c:'#9aa0ac', bg:'#262a33'},
-  {v:'es',      t:'書類選考(ES)', c:'#6cb8ec', bg:'#0e3350'},
-  {v:'test',    t:'適性検査',     c:'#b9a7f7', bg:'#272150'},
-  {v:'1ji',     t:'一次面接',     c:'#5eead4', bg:'#0c3a37'},
-  {v:'2ji',     t:'二次面接',     c:'#5ad6a0', bg:'#0e3a2c'},
-  {v:'final',   t:'最終面接',     c:'#f0b24a', bg:'#3a2c08'},
-  {v:'naitei',  t:'内定',         c:'#6ee787', bg:'#14401f'},
-  {v:'oinori',  t:'お祈り(不採用)', c:'#6b7280', bg:'#23262e'},
+  {v:'entry',   t:'エントリー',   c:'#9aa0ac', bg:'#2b2f38'},
+  {v:'es',      t:'書類選考(ES)', c:'#8bb4d6', bg:'#23323f'},
+  {v:'test',    t:'適性検査',     c:'#a99fd0', bg:'#2d2a40'},
+  {v:'1ji',     t:'一次面接',     c:'#7cc3b4', bg:'#1f3733'},
+  {v:'2ji',     t:'二次面接',     c:'#83c2a0', bg:'#213830'},
+  {v:'final',   t:'最終面接',     c:'#d6ad6a', bg:'#3a3220'},
+  {v:'naitei',  t:'内定',         c:'#83c78e', bg:'#223a28'},
+  {v:'oinori',  t:'お祈り(不採用)', c:'#6b7280', bg:'#282b32'},
 ];
 const stage = v => STAGES.find(s=>s.v===v) || STAGES[0];
 const DONE = ['naitei','oinori']; // 締切警告から除外する完了系
