@@ -74,8 +74,9 @@
   .badge{
     display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;
     padding:4px 11px;border-radius:999px;white-space:nowrap;
+    background:#2b2f38;color:#c4c8d0;
   }
-  .badge::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+  .badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--dot,#888)}
   .meta{display:flex;align-items:center;gap:10px;margin-top:11px;flex-wrap:wrap;font-size:13px}
   .due{display:flex;align-items:center;gap:6px;font-weight:600}
   .due .lbl{font-weight:400;color:var(--muted)}
@@ -475,15 +476,15 @@ function cardHTML(e){
       ${stars?`<div class="stars">${stars}</div>`:''}
     </div>
     <div class="meta">
-      <span class="badge" style="color:${s.c};background:${s.bg}">${s.t}</span>
-      ${d.txt?`<span class="due ${d.cls}">📅 <span>${d.txt}</span>${e.dueLabel?` <span class="lbl">${esc(e.dueLabel)}</span>`:''}</span>`:''}
+      <span class="badge" style="--dot:${s.c}">${s.t}</span>
+      ${d.txt?`<span class="due ${d.cls}"><span>${d.txt}</span>${e.dueLabel?` <span class="lbl">${esc(e.dueLabel)}</span>`:''}</span>`:''}
     </div>
     ${e.memo?`<div class="memo">${esc(e.memo)}</div>`:''}
     <div class="card-links">
-      ${e.due?`<a class="link" href="${gcalUrl(e)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">📅 カレンダーに追加</a>`:''}
-      ${e.url?`<a class="link" href="${esc(e.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 企業ページを開く</a>`:''}
-      ${e.mypage?`<a class="link" href="${esc(e.mypage)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🪪 マイページを開く</a>`:''}
-      ${e.cred?`<a class="link" href="#" onclick="event.stopPropagation();showCred('${e.id}');return false;">🔐 ログイン情報</a>`:''}
+      ${e.due?`<a class="link" href="${gcalUrl(e)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">カレンダーに追加</a>`:''}
+      ${e.url?`<a class="link" href="${esc(e.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">企業ページ</a>`:''}
+      ${e.mypage?`<a class="link" href="${esc(e.mypage)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">マイページ</a>`:''}
+      ${e.cred?`<a class="link" href="#" onclick="event.stopPropagation();showCred('${e.id}');return false;">ログイン情報</a>`:''}
     </div>
   </div>`;
 }
